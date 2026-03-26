@@ -11,6 +11,8 @@ Apache-2.0 license), which reads a unified diff on stdin and applies clang-forma
 the changed hunks.
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 import shutil
@@ -23,10 +25,8 @@ def _diff_script_path() -> Path:
     return Path(__file__).parent / "clang_format_diff.py"
 
 
-def parse_args(argv=None):
-    parser = argparse.ArgumentParser(
-        description="Incrementally format changed C/C++ lines with clang-format."
-    )
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Incrementally format changed C/C++ lines with clang-format.")
     parser.add_argument(
         "files",
         nargs="*",
@@ -47,7 +47,7 @@ def parse_args(argv=None):
         default=None,
         metavar="STYLE",
         help="Style to use when --style=file but no .clang-format file is found "
-             "(e.g. LLVM, Google). Passed through to clang-format.",
+        "(e.g. LLVM, Google). Passed through to clang-format.",
     )
     parser.add_argument(
         "-p",
@@ -55,12 +55,12 @@ def parse_args(argv=None):
         default=1,
         metavar="NUM",
         help="Strip NUM leading path components from filenames in the diff "
-             "(default: 1, matching git's a/ b/ prefixes).",
+        "(default: 1, matching git's a/ b/ prefixes).",
     )
     return parser.parse_args(argv)
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
 
     # Validate the clang-format binary up front for a clear error message.
@@ -81,15 +81,24 @@ def main(argv=None) -> int:
     if from_ref and to_ref:
         # CI mode: pre-commit was invoked with --from-ref/--to-ref
         diff_cmd = [
-            "git", "diff", "-U0", "--no-color",
-            from_ref, to_ref, "--",
+            "git",
+            "diff",
+            "-U0",
+            "--no-color",
+            from_ref,
+            to_ref,
+            "--",
         ] + args.files
     else:
         # Local mode: compare staged (index) vs HEAD.
         # Also used when only one of the two env vars is set (misconfiguration).
         diff_cmd = [
-            "git", "diff", "-U0", "--no-color",
-            "--cached", "--",
+            "git",
+            "diff",
+            "-U0",
+            "--no-color",
+            "--cached",
+            "--",
         ] + args.files
 
     try:
