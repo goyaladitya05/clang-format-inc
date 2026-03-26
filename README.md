@@ -30,22 +30,21 @@ pre-commit (CI, --from-ref/--to-ref)
   └─ sets PRE_COMMIT_FROM_REF, PRE_COMMIT_TO_REF
       └─ clang-format-inc
           └─ git diff -U0 $FROM_REF $TO_REF -- <files>
-              └─ clang-format-diff.py -i -p1  ← formats only changed lines
-
+              └─ clang-format --lines=<start>:<end> -i <file>  ← only changed lines
 pre-commit (local)
   └─ clang-format-inc
       └─ git diff -U0 --cached -- <files>
-          └─ clang-format-diff.py -i -p1
+          └─ clang-format --lines=<start>:<end> -i <file>
 ```
 
-The diff is piped to [clang-format-diff.py](https://github.com/llvm/llvm-project/blob/main/clang/tools/clang-format/clang-format-diff.py) (bundled from LLVM), which calls `clang-format --lines=<start>:<end>` for each changed hunk. **Only touched lines are reformatted.**
+The diff is parsed to extract added-line ranges per file. `clang-format` is called with `--lines=start:end` for each changed hunk — **only touched lines are reformatted.**
 
 ---
 
 ## Requirements
 
 - Python 3.8+
-- `clang-format` on `PATH` (or specify with `--binary`)
+- `clang-format` — installed automatically by pre-commit via `additional_dependencies` (see below), or specify a custom binary with `--binary`
 
 ---
 
@@ -56,20 +55,38 @@ Add to your `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/goyaladitya05/clang-format-inc
-    rev: v0.1.0
+    rev: v0.2.0
     hooks:
       - id: clang-format-inc
-        # Optional overrides:
-        # args: [--binary=clang-format-17, --style=Google]
 ```
 
-Run locally:
+`clang-format` is installed automatically into the hook's virtualenv — no system-wide install needed.
+
+### Pin a specific clang-format version
+
+```yaml
+hooks:
+  - id: clang-format-inc
+    additional_dependencies: ['clang-format==18.1.0']
+```
+
+### Check mode (report without fixing)
+
+```yaml
+hooks:
+  - id: clang-format-inc
+    args: [--check]
+```
+
+With `--check`, the hook exits non-zero if any changed line would be reformatted, but **never modifies files**. Useful in CI pipelines where you want to report issues without auto-applying fixes.
+
+### Run locally
 
 ```bash
 pre-commit run clang-format-inc --all-files
 ```
 
-Run in CI (GitHub Actions example):
+### Run in CI (GitHub Actions example)
 
 ```yaml
 - name: Run pre-commit
@@ -90,6 +107,8 @@ Options:
   --binary PATH          Path to clang-format binary (default: clang-format)
   --style STYLE          Formatting style: file, LLVM, Google, etc. (default: file)
   --fallback-style STYLE Style to use when --style=file but no .clang-format found
+  --sort-includes        Pass --sort-includes to clang-format
+  --check                Don't modify files; exit non-zero if any file would be reformatted
   -p NUM                 Strip NUM leading path components from diff filenames (default: 1)
 ```
 
@@ -116,5 +135,4 @@ When both are set, `clang-format-inc` diffs those two commits. Otherwise it diff
 
 ## License
 
-- `clang-format-inc` itself: **MIT** © Aditya Goyal
-- Bundled `clang_format_diff.py`: **Apache-2.0 WITH LLVM-exception** (from the LLVM Project)
+MIT © Aditya Goyal
