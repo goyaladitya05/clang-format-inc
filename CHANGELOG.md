@@ -9,6 +9,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-03-26
+
+### Added
+
+- **`--check` mode**: run without modifying files; exits non-zero and prints a message
+  if any changed line would be reformatted — suitable for CI pipelines that want to
+  report formatting issues without auto-applying fixes
+- **`additional_dependencies: ['clang-format']`** in `.pre-commit-hooks.yaml`: pre-commit
+  now installs the `clang-format` PyPI package automatically into the hook virtualenv,
+  removing the requirement for a system-installed `clang-format`; users can pin a
+  specific version via `additional_dependencies: ['clang-format==18.1.0']` in their
+  own `.pre-commit-config.yaml`
+
 ## [0.1.0] — 2026-03-26
 
 Initial release.
@@ -32,5 +45,6 @@ Initial release.
 - `.pre-commit-hooks.yaml` so this repo can be used directly as a pre-commit hook source
 - `py.typed` marker for PEP 561 compatibility
 
-[Unreleased]: https://github.com/goyaladitya05/clang-format-inc/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/goyaladitya05/clang-format-inc/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/goyaladitya05/clang-format-inc/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/goyaladitya05/clang-format-inc/releases/tag/v0.1.0

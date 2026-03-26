@@ -156,3 +156,48 @@ class TestFormatHunksErrors:
         assert result != 0
         # good.cpp was not reformatted because we stopped after the first error
         assert good.read_text() == "int x=1;\n"
+
+
+# ---------------------------------------------------------------------------
+# --check mode
+# ---------------------------------------------------------------------------
+
+
+@requires_clang_format
+class TestCheckMode:
+    def test_check_returns_nonzero_for_bad_code(self, cpp_workspace: Path):
+        f = cpp_workspace / "test.cpp"
+        f.write_text("int x=1;\n")
+
+        result = format_hunks("clang-format", {"test.cpp": [(1, 1)]}, check=True)
+
+        assert result != 0
+
+    def test_check_does_not_modify_file(self, cpp_workspace: Path):
+        f = cpp_workspace / "test.cpp"
+        original = "int x=1;\n"
+        f.write_text(original)
+
+        format_hunks("clang-format", {"test.cpp": [(1, 1)]}, check=True)
+
+        assert f.read_text() == original
+
+    def test_check_returns_zero_for_already_formatted(self, cpp_workspace: Path):
+        f = cpp_workspace / "test.cpp"
+        f.write_text("int x = 1;\n")
+
+        result = format_hunks("clang-format", {"test.cpp": [(1, 1)]}, check=True)
+
+        assert result == 0
+
+    def test_check_only_inspects_hunk_range(self, cpp_workspace: Path):
+        """Badly-formatted lines outside the hunk range must not trigger a failure."""
+        f = cpp_workspace / "test.cpp"
+        f.write_text(
+            "int a=1;\n"  # line 1 — bad, but NOT in hunk range
+            "int b = 2;\n"  # line 2 — good, IN hunk range
+        )
+
+        result = format_hunks("clang-format", {"test.cpp": [(2, 2)]}, check=True)
+
+        assert result == 0  # only line 2 is checked; line 1 is ignored

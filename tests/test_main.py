@@ -234,3 +234,42 @@ class TestErrors:
 
         result = main([])
         assert result != 0
+
+
+# ---------------------------------------------------------------------------
+# --check mode
+# ---------------------------------------------------------------------------
+
+
+@requires_clang_format
+class TestCheckMode:
+    def test_check_fails_when_staged_bad_code(self, repo: Path):
+        f = repo / "foo.cpp"
+        f.write_text(BADLY_FORMATTED)
+        subprocess.run(["git", "add", "foo.cpp"], check=True, capture_output=True)
+
+        result = main(["--check", "foo.cpp"])
+
+        assert result != 0
+
+    def test_check_does_not_modify_staged_file(self, repo: Path):
+        f = repo / "foo.cpp"
+        f.write_text(BADLY_FORMATTED)
+        subprocess.run(["git", "add", "foo.cpp"], check=True, capture_output=True)
+
+        main(["--check", "foo.cpp"])
+
+        assert f.read_text() == BADLY_FORMATTED
+
+    def test_check_passes_when_staged_good_code(self, repo: Path):
+        f = repo / "foo.cpp"
+        f.write_text(WELL_FORMATTED)
+        subprocess.run(["git", "add", "foo.cpp"], check=True, capture_output=True)
+
+        result = main(["--check", "foo.cpp"])
+
+        assert result == 0
+
+    def test_check_nothing_staged_returns_zero(self, repo: Path):
+        result = main(["--check"])
+        assert result == 0

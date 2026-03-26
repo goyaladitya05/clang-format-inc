@@ -57,6 +57,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Strip NUM leading path components from filenames in the diff "
         "(default: 1, matching git's a/ b/ prefixes).",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        default=False,
+        help="Don't modify files; exit non-zero if any file would be reformatted.",
+    )
     return parser.parse_args(argv)
 
 
@@ -104,4 +110,5 @@ def main(argv: list[str] | None = None) -> int:
         style=args.style,
         fallback_style=args.fallback_style,
         sort_includes=args.sort_includes,
+        check=args.check,
     )

@@ -8,3 +8,4 @@
   types_or: [c, c++, cuda, objective-c]
   require_serial: true
   pass_filenames: true
+  additional_dependencies: ['clang-format']
