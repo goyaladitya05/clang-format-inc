@@ -1,94 +1,46 @@
-"""Tests for clang_format_inc.main"""
+"""
+Integration tests for clang_format_inc.main.
 
-import os
+These tests use real git repositories (via the git_repo fixture) and real
+clang-format invocations. No mocking anywhere.
+"""
+
+from __future__ import annotations
+
 import subprocess
-import unittest
-from unittest.mock import MagicMock, patch
+from pathlib import Path
+
+import pytest
 
 from clang_format_inc.main import main, parse_args
+from tests.conftest import commit_file, requires_clang_format
 
-# ---------------------------------------------------------------------------
-# Diff fixtures
-# ---------------------------------------------------------------------------
+# A minimal style config so tests are not sensitive to the user's repo config.
+CLANG_FORMAT_CONFIG = "BasedOnStyle: LLVM\nIndentWidth: 4\nColumnLimit: 120\n"
 
-SAMPLE_DIFF = """\
-diff --git a/foo.cpp b/foo.cpp
-index 0000000..1111111 100644
---- a/foo.cpp
-+++ b/foo.cpp
-@@ -1,3 +1,4 @@
- #include <iostream>
-+int x=1;
- int main() { return 0; }
-"""
-
-# Only lines deleted — no added lines.  clang-format-diff skips +N,0 hunks.
-DELETIONS_ONLY_DIFF = """\
-diff --git a/foo.cpp b/foo.cpp
-index 1111111..0000000 100644
---- a/foo.cpp
-+++ b/foo.cpp
-@@ -2,3 +2,0 @@
--int x = 1;
--int y = 2;
--int z = 3;
-"""
-
-# Entire file deleted — +++ /dev/null won't match any C++ filename regex.
-DELETED_FILE_DIFF = """\
-diff --git a/old.cpp b/old.cpp
-deleted file mode 100644
-index 1111111..0000000
---- a/old.cpp
-+++ /dev/null
-@@ -1,3 +0,0 @@
--#include <iostream>
--int main() { return 0; }
-"""
-
-# Multiple files changed in one diff.
-MULTI_FILE_DIFF = """\
-diff --git a/src/a.cpp b/src/a.cpp
-index 0000000..1111111 100644
---- a/src/a.cpp
-+++ b/src/a.cpp
-@@ -1,2 +1,3 @@
- #include <iostream>
-+int a=1;
- int main(){}
-diff --git a/src/b.cpp b/src/b.cpp
-index 0000000..2222222 100644
---- a/src/b.cpp
-+++ b/src/b.cpp
-@@ -1,2 +1,3 @@
- #include <string>
-+std::string s="hello";
- int foo(){}
-diff --git a/include/c.h b/include/c.h
-index 0000000..3333333 100644
---- a/include/c.h
-+++ b/include/c.h
-@@ -1,1 +1,2 @@
- #pragma once
-+int x=42;
-"""
+BADLY_FORMATTED = "int main(){int x=1;return x;}\n"
+WELL_FORMATTED = "int main() {\n    int x = 1;\n    return x;\n}\n"
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Fixtures
 # ---------------------------------------------------------------------------
 
 
-def _make_run(stdout="", returncode=0):
-    mock = MagicMock()
-    mock.stdout = stdout
-    mock.returncode = returncode
-    return mock
+@pytest.fixture(autouse=True)
+def clear_pre_commit_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure CI env vars are absent unless a test sets them explicitly."""
+    monkeypatch.delenv("PRE_COMMIT_FROM_REF", raising=False)
+    monkeypatch.delenv("PRE_COMMIT_TO_REF", raising=False)
 
 
-def _clear_ci_env():
-    for key in ("PRE_COMMIT_FROM_REF", "PRE_COMMIT_TO_REF"):
-        os.environ.pop(key, None)
+@pytest.fixture
+def repo(git_repo: Path) -> Path:
+    """git_repo with a .clang-format config committed."""
+    (git_repo / ".clang-format").write_text(CLANG_FORMAT_CONFIG)
+    subprocess.run(["git", "add", ".clang-format"], check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "add clang-format config"], check=True, capture_output=True)
+    return git_repo
 
 
 # ---------------------------------------------------------------------------
@@ -96,16 +48,17 @@ def _clear_ci_env():
 # ---------------------------------------------------------------------------
 
 
-class TestParseArgs(unittest.TestCase):
+class TestParseArgs:
     def test_defaults(self):
         args = parse_args([])
-        self.assertEqual(args.binary, "clang-format")
-        self.assertEqual(args.style, "file")
-        self.assertIsNone(args.fallback_style)
-        self.assertEqual(args.p, 1)
-        self.assertEqual(args.files, [])
+        assert args.binary == "clang-format"
+        assert args.style == "file"
+        assert args.fallback_style is None
+        assert args.sort_includes is False
+        assert args.p == 1
+        assert args.files == []
 
-    def test_custom_options(self):
+    def test_all_options(self):
         args = parse_args(
             [
                 "--binary",
@@ -114,304 +67,170 @@ class TestParseArgs(unittest.TestCase):
                 "Google",
                 "--fallback-style",
                 "LLVM",
+                "--sort-includes",
                 "-p",
                 "2",
                 "a.cpp",
+                "b.cpp",
             ]
         )
-        self.assertEqual(args.binary, "/usr/bin/clang-format-17")
-        self.assertEqual(args.style, "Google")
-        self.assertEqual(args.fallback_style, "LLVM")
-        self.assertEqual(args.p, 2)
-        self.assertEqual(args.files, ["a.cpp"])
+        assert args.binary == "/usr/bin/clang-format-17"
+        assert args.style == "Google"
+        assert args.fallback_style == "LLVM"
+        assert args.sort_includes is True
+        assert args.p == 2
+        assert args.files == ["a.cpp", "b.cpp"]
 
 
 # ---------------------------------------------------------------------------
-# CI mode
+# Binary validation (no git repo needed)
 # ---------------------------------------------------------------------------
 
 
-class TestCIMode(unittest.TestCase):
-    """Both FROM_REF and TO_REF set → git diff <from> <to>."""
+class TestBinaryValidation:
+    def test_nonexistent_binary_returns_1(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.chdir(tmp_path)
+        result = main(["--binary", "clang-format-does-not-exist-xyz"])
+        assert result == 1
 
-    def setUp(self):
-        _clear_ci_env()
-
-    def test_uses_both_refs(self):
-        with patch.dict(os.environ, {"PRE_COMMIT_FROM_REF": "abc123", "PRE_COMMIT_TO_REF": "def456"}):
-            with patch("shutil.which", return_value="/usr/bin/clang-format"):
-                with patch("subprocess.run", side_effect=[_make_run(SAMPLE_DIFF), _make_run()]) as mock_run:
-                    result = main(["foo.cpp"])
-
-        args = mock_run.call_args_list[0][0][0]
-        self.assertIn("abc123", args)
-        self.assertIn("def456", args)
-        self.assertNotIn("--cached", args)
-        self.assertEqual(result, 0)
-
-    def test_passes_files_to_diff(self):
-        with patch.dict(os.environ, {"PRE_COMMIT_FROM_REF": "aaa", "PRE_COMMIT_TO_REF": "bbb"}):
-            with patch("shutil.which", return_value="/usr/bin/clang-format"):
-                with patch("subprocess.run", side_effect=[_make_run(SAMPLE_DIFF), _make_run()]) as mock_run:
-                    main(["src/foo.cpp", "src/bar.cpp"])
-
-        args = mock_run.call_args_list[0][0][0]
-        self.assertIn("src/foo.cpp", args)
-        self.assertIn("src/bar.cpp", args)
-
-    def test_only_from_ref_set_falls_back_to_local(self):
-        """Only one env var set → fall back to --cached (misconfiguration guard)."""
-        with patch.dict(os.environ, {"PRE_COMMIT_FROM_REF": "abc"}, clear=False):
-            os.environ.pop("PRE_COMMIT_TO_REF", None)
-            with patch("shutil.which", return_value="/usr/bin/clang-format"):
-                with patch("subprocess.run", side_effect=[_make_run(SAMPLE_DIFF), _make_run()]) as mock_run:
-                    main([])
-
-        args = mock_run.call_args_list[0][0][0]
-        self.assertIn("--cached", args)
-
-    def test_only_to_ref_set_falls_back_to_local(self):
-        """Only one env var set → fall back to --cached (misconfiguration guard)."""
-        os.environ.pop("PRE_COMMIT_FROM_REF", None)
-        with patch.dict(os.environ, {"PRE_COMMIT_TO_REF": "def"}, clear=False):
-            with patch("shutil.which", return_value="/usr/bin/clang-format"):
-                with patch("subprocess.run", side_effect=[_make_run(SAMPLE_DIFF), _make_run()]) as mock_run:
-                    main([])
-
-        args = mock_run.call_args_list[0][0][0]
-        self.assertIn("--cached", args)
+    def test_nonexistent_binary_prints_error(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture,  # type: ignore[type-arg]
+    ):
+        monkeypatch.chdir(tmp_path)
+        main(["--binary", "clang-format-xyz-missing"])
+        err = capsys.readouterr().err
+        assert "clang-format-xyz-missing" in err
+        assert "not found" in err
 
 
 # ---------------------------------------------------------------------------
-# Local mode
+# Local mode (git diff --cached)
 # ---------------------------------------------------------------------------
 
 
-class TestLocalMode(unittest.TestCase):
-    """No env vars → git diff --cached."""
+@requires_clang_format
+class TestLocalMode:
+    def test_formats_staged_file(self, repo: Path):
+        f = repo / "foo.cpp"
+        f.write_text(BADLY_FORMATTED)
+        subprocess.run(["git", "add", "foo.cpp"], check=True, capture_output=True)
 
-    def setUp(self):
-        _clear_ci_env()
+        result = main(["foo.cpp"])
 
-    def test_uses_cached(self):
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", side_effect=[_make_run(SAMPLE_DIFF), _make_run()]) as mock_run:
-                result = main(["foo.cpp"])
+        assert result == 0
+        content = f.read_text()
+        assert "int x = 1;" in content
 
-        args = mock_run.call_args_list[0][0][0]
-        self.assertIn("--cached", args)
-        self.assertEqual(result, 0)
+    def test_only_changed_lines_formatted(self, repo: Path):
+        """Lines outside the diff hunk must not be touched."""
+        f = repo / "foo.cpp"
+        commit_file(f, WELL_FORMATTED, "add foo.cpp")
 
-    def test_no_ci_refs_in_command(self):
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", side_effect=[_make_run(SAMPLE_DIFF), _make_run()]) as mock_run:
-                main([])
+        # Stage a new badly-formatted line appended at the end
+        f.write_text(WELL_FORMATTED + "int y=2;\n")
+        subprocess.run(["git", "add", "foo.cpp"], check=True, capture_output=True)
 
-        args = mock_run.call_args_list[0][0][0]
-        self.assertFalse(any("PRE_COMMIT" in a for a in args))
+        result = main(["foo.cpp"])
 
+        assert result == 0
+        lines = f.read_text().splitlines()
+        assert lines[0] == "int main() {"  # original line untouched
+        assert "int y = 2;" in lines  # appended bad line fixed
 
-# ---------------------------------------------------------------------------
-# Empty / no-op diffs
-# ---------------------------------------------------------------------------
+    def test_unstaged_changes_not_formatted(self, repo: Path):
+        """Only staged changes should be picked up."""
+        f = repo / "foo.cpp"
+        commit_file(f, WELL_FORMATTED, "add foo.cpp")
 
+        # Modify but do NOT stage
+        f.write_text(BADLY_FORMATTED)
 
-class TestEmptyDiff(unittest.TestCase):
-    """When there are no changed lines, clang-format-diff should not be invoked."""
+        result = main(["foo.cpp"])
 
-    def setUp(self):
-        _clear_ci_env()
+        assert result == 0
+        assert f.read_text() == BADLY_FORMATTED  # untouched — not staged
 
-    def test_skips_formatting_when_diff_empty(self):
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", return_value=_make_run("")) as mock_run:
-                result = main([])
+    def test_nothing_staged_returns_0(self, repo: Path):
+        result = main([])
+        assert result == 0
 
-        self.assertEqual(mock_run.call_count, 1)
-        self.assertEqual(result, 0)
+    def test_formats_multiple_staged_files(self, repo: Path):
+        a = repo / "a.cpp"
+        b = repo / "b.cpp"
+        a.write_text("int x=1;\n")
+        b.write_text("int y=2;\n")
+        subprocess.run(["git", "add", "a.cpp", "b.cpp"], check=True, capture_output=True)
 
-    def test_skips_formatting_when_diff_whitespace_only(self):
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", return_value=_make_run("   \n  \n")) as mock_run:
-                result = main([])
+        result = main(["a.cpp", "b.cpp"])
 
-        self.assertEqual(mock_run.call_count, 1)
-        self.assertEqual(result, 0)
-
-    def test_deletions_only_diff_is_passed_through(self):
-        """A diff with only deletions is non-empty so we pass it to clang-format-diff,
-        which internally skips +N,0 hunks. We must not short-circuit here."""
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", side_effect=[_make_run(DELETIONS_ONLY_DIFF), _make_run()]) as mock_run:
-                result = main([])
-
-        # Both git diff AND clang-format-diff were called
-        self.assertEqual(mock_run.call_count, 2)
-        self.assertEqual(result, 0)
-
-    def test_deleted_file_diff_is_passed_through(self):
-        """A deleted-file diff (+++ /dev/null) is non-empty; clang-format-diff
-        won't match /dev/null against its C++ regex so it's a no-op — but we
-        must still pipe it through rather than silently skip."""
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", side_effect=[_make_run(DELETED_FILE_DIFF), _make_run()]) as mock_run:
-                result = main([])
-
-        self.assertEqual(mock_run.call_count, 2)
-        self.assertEqual(result, 0)
+        assert result == 0
+        assert "int x = 1;" in a.read_text()
+        assert "int y = 2;" in b.read_text()
 
 
 # ---------------------------------------------------------------------------
-# Multi-file diffs
+# CI mode (PRE_COMMIT_FROM_REF / PRE_COMMIT_TO_REF)
 # ---------------------------------------------------------------------------
 
 
-class TestMultiFileDiff(unittest.TestCase):
-    def setUp(self):
-        _clear_ci_env()
+@requires_clang_format
+class TestCIMode:
+    def test_formats_changed_lines_between_refs(self, repo: Path, monkeypatch: pytest.MonkeyPatch):
+        f = repo / "foo.cpp"
+        from_sha = commit_file(f, WELL_FORMATTED, "add foo.cpp")
+        to_sha = commit_file(f, WELL_FORMATTED + "int y=2;\n", "append bad line")
 
-    def test_multi_file_diff_is_passed_through_intact(self):
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", side_effect=[_make_run(MULTI_FILE_DIFF), _make_run()]) as mock_run:
-                result = main([])
+        monkeypatch.setenv("PRE_COMMIT_FROM_REF", from_sha)
+        monkeypatch.setenv("PRE_COMMIT_TO_REF", to_sha)
 
-        self.assertEqual(mock_run.call_count, 2)
-        # The entire diff is sent as stdin to clang-format-diff
-        stdin_input = mock_run.call_args_list[1][1].get("input")
-        self.assertEqual(stdin_input, MULTI_FILE_DIFF)
-        self.assertEqual(result, 0)
+        result = main(["foo.cpp"])
 
+        assert result == 0
+        content = f.read_text()
+        assert "int y = 2;" in content  # changed line formatted
+        assert "int main() {" in content  # unchanged line untouched
 
-# ---------------------------------------------------------------------------
-# Error handling
-# ---------------------------------------------------------------------------
+    def test_does_not_format_lines_outside_diff(self, repo: Path, monkeypatch: pytest.MonkeyPatch):
+        """Pre-existing badly-formatted lines not in the diff must not be touched."""
+        f = repo / "foo.cpp"
+        from_sha = commit_file(f, "int a=99;\n", "initial bad line 1")
+        to_sha = commit_file(f, "int a=99;\nint b=2;\n", "append bad line 2")
 
+        monkeypatch.setenv("PRE_COMMIT_FROM_REF", from_sha)
+        monkeypatch.setenv("PRE_COMMIT_TO_REF", to_sha)
 
-class TestErrorHandling(unittest.TestCase):
-    def setUp(self):
-        _clear_ci_env()
+        result = main(["foo.cpp"])
 
-    def test_git_diff_failure_returns_nonzero(self):
-        exc = subprocess.CalledProcessError(returncode=128, cmd=["git", "diff"], stderr="not a git repo")
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", side_effect=exc):
-                result = main([])
+        assert result == 0
+        lines = f.read_text().splitlines()
+        assert lines[0] == "int a=99;"  # NOT in the diff — untouched
+        assert lines[1] == "int b = 2;"  # in the diff — formatted
 
-        self.assertEqual(result, 128)
+    def test_only_from_ref_set_falls_back_to_local(self, repo: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("PRE_COMMIT_FROM_REF", "abc123")
+        # PRE_COMMIT_TO_REF absent — should fall back to local mode (nothing staged → 0)
+        result = main([])
+        assert result == 0
 
-    def test_git_diff_failure_prints_stderr(self):
-        exc = subprocess.CalledProcessError(returncode=128, cmd=["git", "diff"], stderr="fatal: not a repo")
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", side_effect=exc):
-                with patch("sys.stderr") as mock_stderr:
-                    main([])
-                    output = "".join(str(c) for c in mock_stderr.write.call_args_list)
-                    self.assertIn("git diff failed", output)
-
-    def test_clang_format_not_on_path_returns_1(self):
-        with patch("shutil.which", return_value=None):
-            result = main([])
-
-        self.assertEqual(result, 1)
-
-    def test_clang_format_not_on_path_prints_message(self):
-        with patch("shutil.which", return_value=None):
-            with patch("sys.stderr") as mock_stderr:
-                main(["--binary", "clang-format-99"])
-                output = "".join(str(c) for c in mock_stderr.write.call_args_list)
-                self.assertIn("clang-format-99", output)
-                self.assertIn("not found", output)
-
-    def test_clang_format_not_found_skips_git_diff(self):
-        """When the binary is missing we bail before even calling git."""
-        with patch("shutil.which", return_value=None):
-            with patch("subprocess.run") as mock_run:
-                main([])
-
-        mock_run.assert_not_called()
-
-    def test_format_script_nonzero_returncode_propagated(self):
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", side_effect=[_make_run(SAMPLE_DIFF), _make_run(returncode=1)]):
-                result = main([])
-
-        self.assertEqual(result, 1)
+    def test_only_to_ref_set_falls_back_to_local(self, repo: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("PRE_COMMIT_TO_REF", "abc123")
+        result = main([])
+        assert result == 0
 
 
 # ---------------------------------------------------------------------------
-# Format command flags
+# Error propagation
 # ---------------------------------------------------------------------------
 
 
-class TestFormatCommand(unittest.TestCase):
-    def setUp(self):
-        _clear_ci_env()
+@requires_clang_format
+class TestErrors:
+    def test_invalid_git_ref_returns_nonzero(self, repo: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("PRE_COMMIT_FROM_REF", "deadbeefdeadbeef")
+        monkeypatch.setenv("PRE_COMMIT_TO_REF", "cafecafecafecafe")
 
-    def test_inplace_flag(self):
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", side_effect=[_make_run(SAMPLE_DIFF), _make_run()]) as mock_run:
-                main([])
-
-        args = mock_run.call_args_list[1][0][0]
-        self.assertIn("-i", args)
-
-    def test_custom_binary(self):
-        with patch("shutil.which", return_value="/opt/llvm/bin/clang-format-17"):
-            with patch("subprocess.run", side_effect=[_make_run(SAMPLE_DIFF), _make_run()]) as mock_run:
-                main(["--binary", "/opt/llvm/bin/clang-format-17"])
-
-        args = mock_run.call_args_list[1][0][0]
-        self.assertTrue(any("-binary=/opt/llvm/bin/clang-format-17" in a for a in args))
-
-    def test_custom_style(self):
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", side_effect=[_make_run(SAMPLE_DIFF), _make_run()]) as mock_run:
-                main(["--style", "Google"])
-
-        args = mock_run.call_args_list[1][0][0]
-        self.assertTrue(any("-style=Google" in a for a in args))
-
-    def test_fallback_style_included_when_set(self):
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", side_effect=[_make_run(SAMPLE_DIFF), _make_run()]) as mock_run:
-                main(["--fallback-style", "LLVM"])
-
-        args = mock_run.call_args_list[1][0][0]
-        self.assertTrue(any("-fallback-style=LLVM" in a for a in args))
-
-    def test_fallback_style_absent_when_not_set(self):
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", side_effect=[_make_run(SAMPLE_DIFF), _make_run()]) as mock_run:
-                main([])
-
-        args = mock_run.call_args_list[1][0][0]
-        self.assertFalse(any("-fallback-style" in a for a in args))
-
-    def test_p_flag_default(self):
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", side_effect=[_make_run(SAMPLE_DIFF), _make_run()]) as mock_run:
-                main([])
-
-        args = mock_run.call_args_list[1][0][0]
-        self.assertIn("-p1", args)
-
-    def test_p_flag_custom(self):
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", side_effect=[_make_run(SAMPLE_DIFF), _make_run()]) as mock_run:
-                main(["-p", "2"])
-
-        args = mock_run.call_args_list[1][0][0]
-        self.assertIn("-p2", args)
-        self.assertNotIn("-p1", args)
-
-    def test_diff_piped_as_stdin(self):
-        with patch("shutil.which", return_value="/usr/bin/clang-format"):
-            with patch("subprocess.run", side_effect=[_make_run(SAMPLE_DIFF), _make_run()]) as mock_run:
-                main([])
-
-        kwargs = mock_run.call_args_list[1][1]
-        self.assertEqual(kwargs.get("input"), SAMPLE_DIFF)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        result = main([])
+        assert result != 0
