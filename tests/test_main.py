@@ -2,12 +2,10 @@
 
 import os
 import subprocess
-import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
 from clang_format_inc.main import main, parse_args
-
 
 # ---------------------------------------------------------------------------
 # Diff fixtures
@@ -80,6 +78,7 @@ index 0000000..3333333 100644
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_run(stdout="", returncode=0):
     mock = MagicMock()
     mock.stdout = stdout
@@ -96,6 +95,7 @@ def _clear_ci_env():
 # parse_args
 # ---------------------------------------------------------------------------
 
+
 class TestParseArgs(unittest.TestCase):
     def test_defaults(self):
         args = parse_args([])
@@ -106,13 +106,19 @@ class TestParseArgs(unittest.TestCase):
         self.assertEqual(args.files, [])
 
     def test_custom_options(self):
-        args = parse_args([
-            "--binary", "/usr/bin/clang-format-17",
-            "--style", "Google",
-            "--fallback-style", "LLVM",
-            "-p", "2",
-            "a.cpp",
-        ])
+        args = parse_args(
+            [
+                "--binary",
+                "/usr/bin/clang-format-17",
+                "--style",
+                "Google",
+                "--fallback-style",
+                "LLVM",
+                "-p",
+                "2",
+                "a.cpp",
+            ]
+        )
         self.assertEqual(args.binary, "/usr/bin/clang-format-17")
         self.assertEqual(args.style, "Google")
         self.assertEqual(args.fallback_style, "LLVM")
@@ -123,6 +129,7 @@ class TestParseArgs(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # CI mode
 # ---------------------------------------------------------------------------
+
 
 class TestCIMode(unittest.TestCase):
     """Both FROM_REF and TO_REF set → git diff <from> <to>."""
@@ -179,6 +186,7 @@ class TestCIMode(unittest.TestCase):
 # Local mode
 # ---------------------------------------------------------------------------
 
+
 class TestLocalMode(unittest.TestCase):
     """No env vars → git diff --cached."""
 
@@ -206,6 +214,7 @@ class TestLocalMode(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Empty / no-op diffs
 # ---------------------------------------------------------------------------
+
 
 class TestEmptyDiff(unittest.TestCase):
     """When there are no changed lines, clang-format-diff should not be invoked."""
@@ -256,6 +265,7 @@ class TestEmptyDiff(unittest.TestCase):
 # Multi-file diffs
 # ---------------------------------------------------------------------------
 
+
 class TestMultiFileDiff(unittest.TestCase):
     def setUp(self):
         _clear_ci_env()
@@ -275,6 +285,7 @@ class TestMultiFileDiff(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Error handling
 # ---------------------------------------------------------------------------
+
 
 class TestErrorHandling(unittest.TestCase):
     def setUp(self):
@@ -330,6 +341,7 @@ class TestErrorHandling(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Format command flags
 # ---------------------------------------------------------------------------
+
 
 class TestFormatCommand(unittest.TestCase):
     def setUp(self):
