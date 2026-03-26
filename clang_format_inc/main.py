@@ -13,6 +13,7 @@ the changed hunks.
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -42,6 +43,13 @@ def parse_args(argv=None):
         help="Formatting style passed to clang-format (default: file).",
     )
     parser.add_argument(
+        "--fallback-style",
+        default=None,
+        metavar="STYLE",
+        help="Style to use when --style=file but no .clang-format file is found "
+             "(e.g. LLVM, Google). Passed through to clang-format.",
+    )
+    parser.add_argument(
         "-p",
         type=int,
         default=1,
@@ -55,6 +63,18 @@ def parse_args(argv=None):
 def main(argv=None) -> int:
     args = parse_args(argv)
 
+    # Validate the clang-format binary up front for a clear error message.
+    # (clang-format-diff.py raises a RuntimeError if it can't find the binary,
+    # but the traceback is noisy; a pre-check is friendlier.)
+    if shutil.which(args.binary) is None:
+        print(
+            f"clang-format-inc: '{args.binary}' not found. "
+            "Install clang-format and make sure it is on PATH, "
+            "or pass --binary=/path/to/clang-format.",
+            file=sys.stderr,
+        )
+        return 1
+
     from_ref = os.environ.get("PRE_COMMIT_FROM_REF")
     to_ref = os.environ.get("PRE_COMMIT_TO_REF")
 
@@ -65,7 +85,8 @@ def main(argv=None) -> int:
             from_ref, to_ref, "--",
         ] + args.files
     else:
-        # Local mode: compare staged (index) vs HEAD
+        # Local mode: compare staged (index) vs HEAD.
+        # Also used when only one of the two env vars is set (misconfiguration).
         diff_cmd = [
             "git", "diff", "-U0", "--no-color",
             "--cached", "--",
@@ -96,19 +117,12 @@ def main(argv=None) -> int:
         f"-style={args.style}",
         f"-binary={args.binary}",
     ]
+    if args.fallback_style:
+        format_cmd.append(f"-fallback-style={args.fallback_style}")
 
-    try:
-        result = subprocess.run(
-            format_cmd,
-            input=diff_output,
-            text=True,
-        )
-    except FileNotFoundError:
-        print(
-            f"clang-format-inc: could not find clang-format binary '{args.binary}'. "
-            "Make sure it is installed and on PATH.",
-            file=sys.stderr,
-        )
-        return 1
-
+    result = subprocess.run(
+        format_cmd,
+        input=diff_output,
+        text=True,
+    )
     return result.returncode
