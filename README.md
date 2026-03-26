@@ -80,6 +80,16 @@ hooks:
 
 With `--check`, the hook exits non-zero if any changed line would be reformatted, but **never modifies files**. Useful in CI pipelines where you want to report issues without auto-applying fixes.
 
+### Diff mode (show what would change)
+
+```yaml
+hooks:
+  - id: clang-format-inc
+    args: [--diff]
+```
+
+Like `--check`, but also prints a unified diff of every change that would be applied. Useful for PR comment bots or debugging. `--check` and `--diff` are mutually exclusive.
+
 ### Run locally
 
 ```bash
@@ -108,9 +118,19 @@ Options:
   --style STYLE          Formatting style: file, LLVM, Google, etc. (default: file)
   --fallback-style STYLE Style to use when --style=file but no .clang-format found
   --sort-includes        Pass --sort-includes to clang-format
-  --check                Don't modify files; exit non-zero if any file would be reformatted
   -p NUM                 Strip NUM leading path components from diff filenames (default: 1)
+  --include REGEX        Only process files whose path matches this regex
+  --exclude REGEX        Skip files whose path matches this regex
+  --workers N            Number of parallel clang-format processes (default: 1)
+
+Modes (mutually exclusive):
+  --check                Don't modify files; exit non-zero if any file would be reformatted
+  --diff                 Don't modify files; print a unified diff of what would change
 ```
+
+## Notes
+
+**Untracked files** (not yet added to git) have no history to diff against, so they are formatted in their entirety rather than incrementally. Stage the file with `git add` first for incremental behaviour.
 
 ---
 

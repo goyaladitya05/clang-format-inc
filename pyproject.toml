@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clang-format-inc"
-version = "0.2.0"
+version = "0.3.0"
 description = "Incrementally format only changed C/C++ lines with clang-format — works in both local and CI pre-commit contexts"
 readme = "README.md"
 requires-python = ">=3.9"

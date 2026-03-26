@@ -201,3 +201,106 @@ class TestCheckMode:
         result = format_hunks("clang-format", {"test.cpp": [(2, 2)]}, check=True)
 
         assert result == 0  # only line 2 is checked; line 1 is ignored
+
+
+# ---------------------------------------------------------------------------
+# --diff mode
+# ---------------------------------------------------------------------------
+
+
+@requires_clang_format
+class TestDiffMode:
+    def test_diff_returns_nonzero_for_bad_code(self, cpp_workspace: Path):
+        f = cpp_workspace / "test.cpp"
+        f.write_text("int x=1;\n")
+
+        result = format_hunks("clang-format", {"test.cpp": [(1, 1)]}, diff=True)
+
+        assert result != 0
+
+    def test_diff_does_not_modify_file(self, cpp_workspace: Path):
+        f = cpp_workspace / "test.cpp"
+        original = "int x=1;\n"
+        f.write_text(original)
+
+        format_hunks("clang-format", {"test.cpp": [(1, 1)]}, diff=True)
+
+        assert f.read_text() == original
+
+    def test_diff_outputs_unified_diff(self, cpp_workspace: Path, capsys: pytest.CaptureFixture):  # type: ignore[type-arg]
+        f = cpp_workspace / "test.cpp"
+        f.write_text("int x=1;\n")
+
+        format_hunks("clang-format", {"test.cpp": [(1, 1)]}, diff=True)
+
+        out = capsys.readouterr().out
+        assert "---" in out
+        assert "+++" in out
+        assert "-int x=1;" in out
+        assert "+int x = 1;" in out
+
+    def test_diff_returns_zero_for_already_formatted(self, cpp_workspace: Path):
+        f = cpp_workspace / "test.cpp"
+        f.write_text("int x = 1;\n")
+
+        result = format_hunks("clang-format", {"test.cpp": [(1, 1)]}, diff=True)
+
+        assert result == 0
+
+    def test_diff_only_inspects_hunk_range(self, cpp_workspace: Path):
+        """Bad lines outside the hunk range must not appear in the diff."""
+        f = cpp_workspace / "test.cpp"
+        f.write_text(
+            "int a=1;\n"  # line 1 — bad, NOT in range
+            "int b = 2;\n"  # line 2 — good, IN range
+        )
+
+        result = format_hunks("clang-format", {"test.cpp": [(2, 2)]}, diff=True)
+
+        assert result == 0
+
+
+# ---------------------------------------------------------------------------
+# --workers (parallel processing)
+# ---------------------------------------------------------------------------
+
+
+@requires_clang_format
+class TestParallelProcessing:
+    def test_workers_formats_all_files(self, cpp_workspace: Path):
+        """All files must be formatted regardless of worker count."""
+        a = cpp_workspace / "a.cpp"
+        b = cpp_workspace / "b.cpp"
+        c = cpp_workspace / "c.cpp"
+        a.write_text("int x=1;\n")
+        b.write_text("int y=2;\n")
+        c.write_text("int z=3;\n")
+
+        result = format_hunks(
+            "clang-format",
+            {"a.cpp": [(1, 1)], "b.cpp": [(1, 1)], "c.cpp": [(1, 1)]},
+            workers=2,
+        )
+
+        assert result == 0
+        assert "int x = 1;" in a.read_text()
+        assert "int y = 2;" in b.read_text()
+        assert "int z = 3;" in c.read_text()
+
+    def test_workers_check_mode_returns_nonzero(self, cpp_workspace: Path):
+        a = cpp_workspace / "a.cpp"
+        b = cpp_workspace / "b.cpp"
+        a.write_text("int x=1;\n")
+        b.write_text("int y=2;\n")
+
+        result = format_hunks(
+            "clang-format",
+            {"a.cpp": [(1, 1)], "b.cpp": [(1, 1)]},
+            check=True,
+            workers=2,
+        )
+
+        assert result != 0
+        # Files must not be modified even in parallel check mode
+        assert a.read_text() == "int x=1;\n"
+        assert b.read_text() == "int y=2;\n"

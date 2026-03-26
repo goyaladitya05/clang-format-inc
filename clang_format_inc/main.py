@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -58,12 +59,56 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "(default: 1, matching git's a/ b/ prefixes).",
     )
     parser.add_argument(
+        "--include",
+        default=None,
+        metavar="REGEX",
+        help="Only process files whose path matches this regular expression.",
+    )
+    parser.add_argument(
+        "--exclude",
+        default=None,
+        metavar="REGEX",
+        help="Skip files whose path matches this regular expression.",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Number of parallel clang-format processes (default: 1).",
+    )
+
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--check",
         action="store_true",
         default=False,
         help="Don't modify files; exit non-zero if any file would be reformatted.",
     )
+    mode.add_argument(
+        "--diff",
+        action="store_true",
+        default=False,
+        help="Don't modify files; print a unified diff of what would change and "
+        "exit non-zero if any file would be reformatted.",
+    )
     return parser.parse_args(argv)
+
+
+def _filter_hunks(
+    hunks: dict[str, list[tuple[int, int]]],
+    include: str | None,
+    exclude: str | None,
+) -> dict[str, list[tuple[int, int]]]:
+    """Return a copy of *hunks* with files filtered by *include*/*exclude* regexes."""
+    result = {}
+    for filename, ranges in hunks.items():
+        if include is not None and not re.search(include, filename):
+            continue
+        if exclude is not None and re.search(exclude, filename):
+            continue
+        result[filename] = ranges
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -104,6 +149,10 @@ def main(argv: list[str] | None = None) -> int:
     if not hunks:
         return 0
 
+    hunks = _filter_hunks(hunks, args.include, args.exclude)
+    if not hunks:
+        return 0
+
     return format_hunks(
         binary=args.binary,
         hunks=hunks,
@@ -111,4 +160,6 @@ def main(argv: list[str] | None = None) -> int:
         fallback_style=args.fallback_style,
         sort_includes=args.sort_includes,
         check=args.check,
+        diff=args.diff,
+        workers=args.workers,
     )

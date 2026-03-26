@@ -57,6 +57,11 @@ class TestParseArgs:
         assert args.sort_includes is False
         assert args.p == 1
         assert args.files == []
+        assert args.check is False
+        assert args.diff is False
+        assert args.include is None
+        assert args.exclude is None
+        assert args.workers == 1
 
     def test_all_options(self):
         args = parse_args(
@@ -70,6 +75,12 @@ class TestParseArgs:
                 "--sort-includes",
                 "-p",
                 "2",
+                "--include",
+                r".*\.cpp$",
+                "--exclude",
+                r"third_party/",
+                "--workers",
+                "4",
                 "a.cpp",
                 "b.cpp",
             ]
@@ -79,7 +90,16 @@ class TestParseArgs:
         assert args.fallback_style == "LLVM"
         assert args.sort_includes is True
         assert args.p == 2
+        assert args.include == r".*\.cpp$"
+        assert args.exclude == r"third_party/"
+        assert args.workers == 4
         assert args.files == ["a.cpp", "b.cpp"]
+
+    def test_check_and_diff_are_mutually_exclusive(self):
+        import pytest
+
+        with pytest.raises(SystemExit):
+            parse_args(["--check", "--diff"])
 
 
 # ---------------------------------------------------------------------------
@@ -273,3 +293,117 @@ class TestCheckMode:
     def test_check_nothing_staged_returns_zero(self, repo: Path):
         result = main(["--check"])
         assert result == 0
+
+
+# ---------------------------------------------------------------------------
+# --diff mode
+# ---------------------------------------------------------------------------
+
+
+@requires_clang_format
+class TestDiffMode:
+    def test_diff_fails_when_staged_bad_code(self, repo: Path):
+        f = repo / "foo.cpp"
+        f.write_text(BADLY_FORMATTED)
+        subprocess.run(["git", "add", "foo.cpp"], check=True, capture_output=True)
+
+        result = main(["--diff", "foo.cpp"])
+
+        assert result != 0
+
+    def test_diff_does_not_modify_file(self, repo: Path):
+        f = repo / "foo.cpp"
+        f.write_text(BADLY_FORMATTED)
+        subprocess.run(["git", "add", "foo.cpp"], check=True, capture_output=True)
+
+        main(["--diff", "foo.cpp"])
+
+        assert f.read_text() == BADLY_FORMATTED
+
+    def test_diff_outputs_unified_diff(self, repo: Path, capsys: pytest.CaptureFixture):  # type: ignore[type-arg]
+        f = repo / "foo.cpp"
+        f.write_text(BADLY_FORMATTED)
+        subprocess.run(["git", "add", "foo.cpp"], check=True, capture_output=True)
+
+        main(["--diff", "foo.cpp"])
+
+        out = capsys.readouterr().out
+        assert "---" in out
+        assert "+++" in out
+
+    def test_diff_passes_when_staged_good_code(self, repo: Path):
+        f = repo / "foo.cpp"
+        f.write_text(WELL_FORMATTED)
+        subprocess.run(["git", "add", "foo.cpp"], check=True, capture_output=True)
+
+        result = main(["--diff", "foo.cpp"])
+
+        assert result == 0
+
+
+# ---------------------------------------------------------------------------
+# --include / --exclude file filtering
+# ---------------------------------------------------------------------------
+
+
+@requires_clang_format
+class TestFileFiltering:
+    def test_include_processes_matching_files(self, repo: Path):
+        a = repo / "a.cpp"
+        b = repo / "b.cpp"
+        a.write_text("int x=1;\n")
+        b.write_text("int y=2;\n")
+        subprocess.run(["git", "add", "a.cpp", "b.cpp"], check=True, capture_output=True)
+
+        result = main(["--include", r"a\.cpp$", "a.cpp", "b.cpp"])
+
+        assert result == 0
+        assert "int x = 1;" in a.read_text()  # matched — formatted
+        assert b.read_text() == "int y=2;\n"  # not matched — untouched
+
+    def test_exclude_skips_matching_files(self, repo: Path):
+        a = repo / "a.cpp"
+        b = repo / "b.cpp"
+        a.write_text("int x=1;\n")
+        b.write_text("int y=2;\n")
+        subprocess.run(["git", "add", "a.cpp", "b.cpp"], check=True, capture_output=True)
+
+        result = main(["--exclude", r"b\.cpp$", "a.cpp", "b.cpp"])
+
+        assert result == 0
+        assert "int x = 1;" in a.read_text()  # not excluded — formatted
+        assert b.read_text() == "int y=2;\n"  # excluded — untouched
+
+    def test_exclude_all_files_returns_zero(self, repo: Path):
+        f = repo / "foo.cpp"
+        f.write_text("int x=1;\n")
+        subprocess.run(["git", "add", "foo.cpp"], check=True, capture_output=True)
+
+        result = main(["--exclude", r".*", "foo.cpp"])
+
+        assert result == 0
+        assert f.read_text() == "int x=1;\n"  # excluded — untouched
+
+
+# ---------------------------------------------------------------------------
+# --workers (parallel processing)
+# ---------------------------------------------------------------------------
+
+
+@requires_clang_format
+class TestParallelProcessing:
+    def test_workers_formats_all_staged_files(self, repo: Path):
+        a = repo / "a.cpp"
+        b = repo / "b.cpp"
+        c = repo / "c.cpp"
+        a.write_text("int x=1;\n")
+        b.write_text("int y=2;\n")
+        c.write_text("int z=3;\n")
+        subprocess.run(["git", "add", "a.cpp", "b.cpp", "c.cpp"], check=True, capture_output=True)
+
+        result = main(["--workers", "2", "a.cpp", "b.cpp", "c.cpp"])
+
+        assert result == 0
+        assert "int x = 1;" in a.read_text()
+        assert "int y = 2;" in b.read_text()
+        assert "int z = 3;" in c.read_text()

@@ -9,6 +9,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-03-26
+
+### Added
+
+- **`--diff` mode**: print a unified diff of what would change without modifying
+  files; exits non-zero if any changed line would be reformatted — useful for PR
+  comment bots and debugging. Mutually exclusive with `--check`.
+- **`--include REGEX`**: only process files whose path matches the given regular
+  expression; useful when running standalone (outside pre-commit).
+- **`--exclude REGEX`**: skip files whose path matches the given regular expression.
+- **`--workers N`**: process files in parallel using N clang-format processes
+  (default 1); useful for large CI jobs with many changed files.
+- README: document untracked-files behaviour (new files are formatted in full
+  since there is no prior revision to diff against).
+
 ## [0.2.0] — 2026-03-26
 
 ### Added
@@ -45,6 +60,7 @@ Initial release.
 - `.pre-commit-hooks.yaml` so this repo can be used directly as a pre-commit hook source
 - `py.typed` marker for PEP 561 compatibility
 
-[Unreleased]: https://github.com/goyaladitya05/clang-format-inc/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/goyaladitya05/clang-format-inc/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/goyaladitya05/clang-format-inc/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/goyaladitya05/clang-format-inc/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/goyaladitya05/clang-format-inc/releases/tag/v0.1.0
