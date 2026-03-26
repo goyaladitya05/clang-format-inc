@@ -49,7 +49,7 @@ Add to your `.pre-commit-config.yaml`:
 
 ```yaml
 repos:
-  - repo: https://github.com/nishant-goyal/clang-format-inc
+  - repo: https://github.com/goyaladitya05/clang-format-inc
     rev: v0.1.0
     hooks:
       - id: clang-format-inc
@@ -106,5 +106,5 @@ When both are set, `clang-format-inc` diffs those two commits. Otherwise it diff
 
 ## License
 
-- `clang-format-inc` itself: **MIT** © Nishant Goyal
+- `clang-format-inc` itself: **MIT** © Aditya Goyal
 - Bundled `clang_format_diff.py`: **Apache-2.0 WITH LLVM-exception** (from the LLVM Project)

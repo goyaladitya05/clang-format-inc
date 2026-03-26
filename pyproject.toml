@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Nishant Goyal"},
+    {name = "Aditya Goyal"},
 ]
 keywords = ["clang-format", "pre-commit", "c++", "formatter", "incremental"]
 classifiers = [
@@ -33,9 +33,9 @@ classifiers = [
 clang-format-inc = "clang_format_inc.main:main"
 
 [project.urls]
-Homepage = "https://github.com/nishant-goyal/clang-format-inc"
-Repository = "https://github.com/nishant-goyal/clang-format-inc"
-Issues = "https://github.com/nishant-goyal/clang-format-inc/issues"
+Homepage = "https://github.com/goyaladitya05/clang-format-inc"
+Repository = "https://github.com/goyaladitya05/clang-format-inc"
+Issues = "https://github.com/goyaladitya05/clang-format-inc/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
