@@ -1,6 +1,6 @@
 # clang-format-inc
 
-**Incremental C/C++ formatting as a pre-commit hook — format only the lines you changed.**
+**Incremental formatting as a pre-commit hook for C, C++, CUDA, and Objective-C — format only the lines you changed.**
 
 [![CI](https://github.com/goyaladitya05/clang-format-inc/actions/workflows/ci.yml/badge.svg)](https://github.com/goyaladitya05/clang-format-inc/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/clang-format-inc.svg)](https://pypi.org/project/clang-format-inc/)
@@ -20,6 +20,19 @@
 `clang-format-inc` solves both. It reads the `PRE_COMMIT_FROM_REF` / `PRE_COMMIT_TO_REF` environment variables that pre-commit sets in CI mode and falls back to `git diff --cached` locally.
 
 Inspired by [`darker`](https://github.com/akaihola/darker), which does the same thing for Python/Black.
+
+---
+
+## Supported file types
+
+| Language | Extensions |
+|---|---|
+| C | `.c`, `.h` |
+| C++ | `.cpp`, `.cc`, `.cxx`, `.hpp`, `.hxx`, `.hh` |
+| CUDA | `.cu`, `.cuh` |
+| Objective-C | `.m`, `.mm` |
+
+Anything `clang-format` can format, `clang-format-inc` can format incrementally.
 
 ---
 

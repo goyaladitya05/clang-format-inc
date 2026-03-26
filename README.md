@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-**Incremental C/C++ formatting as a pre-commit hook — format only the lines you changed.**
+**Incremental formatting as a pre-commit hook for C, C++, CUDA, and Objective-C — format only the lines you changed.**
 
 ---
 
@@ -19,6 +19,17 @@
 | `git clang-format --staged` | Works locally, but **staging area is empty in CI** when pre-commit uses `--from-ref`/`--to-ref` |
 
 `clang-format-inc` solves both: it reads the `PRE_COMMIT_FROM_REF` / `PRE_COMMIT_TO_REF` environment variables that pre-commit sets in CI mode and falls back to `--cached` (staged changes) locally.
+
+### Supported file types
+
+| Language | Extensions |
+|---|---|
+| C | `.c`, `.h` |
+| C++ | `.cpp`, `.cc`, `.cxx`, `.hpp`, `.hxx`, `.hh` |
+| CUDA | `.cu`, `.cuh` |
+| Objective-C | `.m`, `.mm` |
+
+Anything `clang-format` can format, `clang-format-inc` can format incrementally.
 
 Inspired by [`darker`](https://github.com/akaihola/darker), which does the same for Python/Black.
 
