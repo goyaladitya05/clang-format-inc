@@ -5,10 +5,6 @@ In CI mode  (PRE_COMMIT_FROM_REF + PRE_COMMIT_TO_REF are set by pre-commit when
 running with --from-ref/--to-ref): diffs the two refs and formats only those lines.
 
 In local mode (no env vars): diffs the staging area (--cached) and formats those lines.
-
-The actual line-range formatting is delegated to clang-format-diff.py (bundled from LLVM,
-Apache-2.0 license), which reads a unified diff on stdin and applies clang-format only to
-the changed hunks.
 """
 
 from __future__ import annotations
@@ -18,11 +14,9 @@ import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
-
-def _diff_script_path() -> Path:
-    return Path(__file__).parent / "clang_format_diff.py"
+from clang_format_inc.diff_parser import parse_diff_hunks
+from clang_format_inc.formatter import format_hunks
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -50,6 +44,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "(e.g. LLVM, Google). Passed through to clang-format.",
     )
     parser.add_argument(
+        "--sort-includes",
+        action="store_true",
+        default=False,
+        help="Pass --sort-includes to clang-format.",
+    )
+    parser.add_argument(
         "-p",
         type=int,
         default=1,
@@ -64,8 +64,6 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
 
     # Validate the clang-format binary up front for a clear error message.
-    # (clang-format-diff.py raises a RuntimeError if it can't find the binary,
-    # but the traceback is noisy; a pre-check is friendlier.)
     if shutil.which(args.binary) is None:
         print(
             f"clang-format-inc: '{args.binary}' not found. "
@@ -80,58 +78,30 @@ def main(argv: list[str] | None = None) -> int:
 
     if from_ref and to_ref:
         # CI mode: pre-commit was invoked with --from-ref/--to-ref
-        diff_cmd = [
-            "git",
-            "diff",
-            "-U0",
-            "--no-color",
-            from_ref,
-            to_ref,
-            "--",
-        ] + args.files
+        diff_cmd = ["git", "diff", "-U0", "--no-color", from_ref, to_ref, "--"] + args.files
     else:
         # Local mode: compare staged (index) vs HEAD.
         # Also used when only one of the two env vars is set (misconfiguration).
-        diff_cmd = [
-            "git",
-            "diff",
-            "-U0",
-            "--no-color",
-            "--cached",
-            "--",
-        ] + args.files
+        diff_cmd = ["git", "diff", "-U0", "--no-color", "--cached", "--"] + args.files
 
     try:
-        diff_result = subprocess.run(
-            diff_cmd,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        diff_result = subprocess.run(diff_cmd, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as exc:
         print(f"clang-format-inc: git diff failed:\n{exc.stderr}", file=sys.stderr)
         return exc.returncode
 
     diff_output = diff_result.stdout
     if not diff_output.strip():
-        # Nothing changed — skip formatting entirely
         return 0
 
-    diff_script = _diff_script_path()
-    format_cmd = [
-        sys.executable,
-        str(diff_script),
-        "-i",
-        f"-p{args.p}",
-        f"-style={args.style}",
-        f"-binary={args.binary}",
-    ]
-    if args.fallback_style:
-        format_cmd.append(f"-fallback-style={args.fallback_style}")
+    hunks = parse_diff_hunks(diff_output, p=args.p)
+    if not hunks:
+        return 0
 
-    result = subprocess.run(
-        format_cmd,
-        input=diff_output,
-        text=True,
+    return format_hunks(
+        binary=args.binary,
+        hunks=hunks,
+        style=args.style,
+        fallback_style=args.fallback_style,
+        sort_includes=args.sort_includes,
     )
-    return result.returncode

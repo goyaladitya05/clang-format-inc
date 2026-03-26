@@ -56,7 +56,7 @@ where = ["."]
 include = ["clang_format_inc*"]
 
 [tool.setuptools.package-data]
-clang_format_inc = ["clang_format_diff.py", "py.typed"]
+clang_format_inc = ["py.typed"]
 
 # ---------------------------------------------------------------------------
 # pytest
@@ -72,11 +72,9 @@ addopts = "--tb=short"
 
 [tool.coverage.run]
 source = ["clang_format_inc"]
-# clang_format_diff.py is bundled from LLVM and not ours to cover
-omit = ["clang_format_inc/clang_format_diff.py"]
 
 [tool.coverage.report]
-fail_under = 85
+fail_under = 90
 show_missing = true
 exclude_lines = [
     "if __name__ == .__main__.:",
@@ -90,8 +88,6 @@ exclude_lines = [
 [tool.ruff]
 target-version = "py38"
 line-length = 120
-# clang_format_diff.py is vendored from LLVM — do not lint it
-exclude = ["clang_format_inc/clang_format_diff.py"]
 
 [tool.ruff.lint]
 select = [
@@ -122,5 +118,3 @@ check_untyped_defs = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
-# clang_format_diff.py is bundled from LLVM — don't type-check it
-exclude = ["clang_format_inc/clang_format_diff\\.py"]
