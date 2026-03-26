@@ -53,25 +53,25 @@ def format_hunks(
             # No -i: clang-format writes the fully-formatted file to stdout.
             # Compare to the original; report and fail if they differ.
             try:
-                result = subprocess.run(cmd + [filename], capture_output=True, text=True)
+                check_result = subprocess.run(cmd + [filename], capture_output=True, text=True)
             except FileNotFoundError:
                 return 1
-            if result.returncode != 0:
-                return result.returncode
+            if check_result.returncode != 0:
+                return check_result.returncode
             original = Path(filename).read_text()
-            if result.stdout != original:
+            if check_result.stdout != original:
                 print(f"clang-format-inc: {filename} would be reformatted", file=sys.stderr)
                 return 1
         else:
             # Format in-place.
             try:
-                result = subprocess.run(cmd + ["-i", filename])
+                fmt_result = subprocess.run(cmd + ["-i", filename])
             except FileNotFoundError:
                 # Binary not on PATH — on Windows subprocess raises instead of returning non-zero.
                 # main() guards against this with shutil.which, but format_hunks is also a
                 # public API that callers may invoke directly.
                 return 1
-            if result.returncode != 0:
-                return result.returncode
+            if fmt_result.returncode != 0:
+                return fmt_result.returncode
 
     return 0
