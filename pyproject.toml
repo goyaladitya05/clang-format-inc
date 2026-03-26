@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clang-format-inc"
-version = "0.3.0"
+version = "1.0.0"
 description = "Incrementally format only changed C/C++ lines with clang-format — works in both local and CI pre-commit contexts"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -14,7 +14,7 @@ authors = [
 ]
 keywords = ["clang-format", "pre-commit", "c++", "formatter", "incremental", "linter"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",

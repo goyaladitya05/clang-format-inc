@@ -9,6 +9,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-03-26
+
+First stable release. No breaking changes from 0.3.0 — this marks the API
+and behaviour as production-ready.
+
+### Changed
+
+- Development status bumped to `Production/Stable`
+- Version references in docs updated to `v1.0.0`
+
 ## [0.3.0] — 2026-03-26
 
 ### Added
@@ -60,7 +70,8 @@ Initial release.
 - `.pre-commit-hooks.yaml` so this repo can be used directly as a pre-commit hook source
 - `py.typed` marker for PEP 561 compatibility
 
-[Unreleased]: https://github.com/goyaladitya05/clang-format-inc/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/goyaladitya05/clang-format-inc/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/goyaladitya05/clang-format-inc/compare/v0.3.0...v1.0.0
 [0.3.0]: https://github.com/goyaladitya05/clang-format-inc/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/goyaladitya05/clang-format-inc/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/goyaladitya05/clang-format-inc/releases/tag/v0.1.0
