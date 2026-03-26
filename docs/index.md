@@ -30,7 +30,7 @@ Add to your `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/goyaladitya05/clang-format-inc
-    rev: v0.3.0
+    rev: v1.0.0
     hooks:
       - id: clang-format-inc
 ```
