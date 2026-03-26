@@ -45,8 +45,6 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.tabbed:
       alternate_style: true
-  - pymdownx.snippets:
-      base_path: .
   - tables
   - toc:
       permalink: true
