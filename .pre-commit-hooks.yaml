@@ -1,0 +1,10 @@
+- id: clang-format-inc
+  name: clang-format-inc
+  description: >-
+    Format only changed C/C++ lines with clang-format.
+    Works correctly in both local pre-commit and CI (--from-ref/--to-ref) contexts.
+  entry: clang-format-inc
+  language: python
+  types_or: [c, c++, cuda, objective-c]
+  require_serial: true
+  pass_filenames: true
