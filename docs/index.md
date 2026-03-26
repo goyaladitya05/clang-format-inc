@@ -5,6 +5,7 @@
 [![CI](https://github.com/goyaladitya05/clang-format-inc/actions/workflows/ci.yml/badge.svg)](https://github.com/goyaladitya05/clang-format-inc/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/clang-format-inc.svg)](https://pypi.org/project/clang-format-inc/)
 [![Python versions](https://img.shields.io/pypi/pyversions/clang-format-inc.svg)](https://pypi.org/project/clang-format-inc/)
+[![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://goyaladitya05.github.io/clang-format-inc/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/goyaladitya05/clang-format-inc/blob/main/LICENSE)
 
 ---

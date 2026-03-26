@@ -45,7 +45,8 @@ docs = [
 clang-format-inc = "clang_format_inc.main:main"
 
 [project.urls]
-Homepage = "https://github.com/goyaladitya05/clang-format-inc"
+Homepage = "https://goyaladitya05.github.io/clang-format-inc/"
+Documentation = "https://goyaladitya05.github.io/clang-format-inc/"
 Repository = "https://github.com/goyaladitya05/clang-format-inc"
 Issues = "https://github.com/goyaladitya05/clang-format-inc/issues"
 Changelog = "https://github.com/goyaladitya05/clang-format-inc/blob/main/CHANGELOG.md"
