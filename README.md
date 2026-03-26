@@ -1,5 +1,11 @@
 # clang-format-inc
 
+[![CI](https://github.com/goyaladitya05/clang-format-inc/actions/workflows/ci.yml/badge.svg)](https://github.com/goyaladitya05/clang-format-inc/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/clang-format-inc.svg)](https://pypi.org/project/clang-format-inc/)
+[![Python versions](https://img.shields.io/pypi/pyversions/clang-format-inc.svg)](https://pypi.org/project/clang-format-inc/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 **Incremental C/C++ formatting as a pre-commit hook — format only the lines you changed.**
 
 ---
@@ -67,7 +73,10 @@ Run in CI (GitHub Actions example):
 
 ```yaml
 - name: Run pre-commit
-  run: pre-commit run --from-ref ${{ github.event.pull_request.base.sha }} --to-ref ${{ github.event.pull_request.head.sha }}
+  run: |
+    pre-commit run clang-format-inc \
+      --from-ref ${{ github.event.pull_request.base.sha }} \
+      --to-ref   ${{ github.event.pull_request.head.sha }}
 ```
 
 ---
@@ -78,9 +87,10 @@ Run in CI (GitHub Actions example):
 clang-format-inc [options] [files ...]
 
 Options:
-  --binary PATH   Path to clang-format binary (default: clang-format)
-  --style STYLE   Formatting style: file, LLVM, Google, etc. (default: file)
-  -p NUM          Strip NUM leading path components from diff filenames (default: 1)
+  --binary PATH          Path to clang-format binary (default: clang-format)
+  --style STYLE          Formatting style: file, LLVM, Google, etc. (default: file)
+  --fallback-style STYLE Style to use when --style=file but no .clang-format found
+  -p NUM                 Strip NUM leading path components from diff filenames (default: 1)
 ```
 
 ---
