@@ -1,0 +1,66 @@
+site_name: clang-format-inc
+site_description: Incremental C/C++ formatting as a pre-commit hook — format only the lines you changed.
+site_url: https://goyaladitya05.github.io/clang-format-inc/
+repo_url: https://github.com/goyaladitya05/clang-format-inc
+repo_name: goyaladitya05/clang-format-inc
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - minify:
+      minify_html: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets:
+      base_path: .
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Usage:
+      - Quick start: usage/quickstart.md
+      - Local mode: usage/local.md
+      - CI mode: usage/ci.md
+      - Check & diff modes: usage/check-diff.md
+      - File filtering: usage/filtering.md
+      - Parallel processing: usage/parallel.md
+  - CLI Reference: cli.md
+  - How it works: how-it-works.md
+  - Changelog: changelog.md
