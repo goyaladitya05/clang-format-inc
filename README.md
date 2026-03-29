@@ -9,6 +9,8 @@
 
 **Incremental formatting as a pre-commit hook for C, C++, CUDA, and Objective-C — format only the lines you changed.**
 
+Update: This tool has been merged into LLVM (clang-format) as a feature.
+
 ---
 
 ## The problem
