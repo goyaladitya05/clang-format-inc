@@ -11,6 +11,8 @@
 
 Update: This tool has been merged into LLVM (clang-format) as a feature.
 
+In this repo, the implementation are done using Claude. I have discussed this as a feature with multiple senior C++ developers, got mixed reviews. Some said it makes sense, it should be done, whereas some said it would break diffs. I have stress tested this with various scenarios and nothing has been broken so far. I do not believe that this would break things/cause issues, but if it does, then please report it as an issue on this repository.
+
 ---
 
 ## The problem
